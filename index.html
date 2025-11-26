@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Keuangan ERP - Ekspedisi & PPJK</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- Sidebar Navigasi -->
+        <nav id="sidebar">
+            <div class="sidebar-header">
+                <h2><i class="fas fa-shipping-fast"></i> ERP EKSPEDISI</h2>
+            </div>
+            <ul class="sidebar-nav">
+                <li><a href="#" data-view="dashboard" class="active"><i class="fas fa-home"></i> Dashboard</a></li>
+                <li><a href="#" data-view="invoice"><i class="fas fa-file-invoice-dollar"></i> Invoice</a></li>
+                <li><a href="#" data-view="jurnal"><i class="fas fa-book"></i> Jurnal Umum</a></li>
+                <li><a href="#" data-view="buku-besar"><i class="fas fa-book-open"></i> Buku Besar</a></li>
+                <li><a href="#" data-view="laba-rugi"><i class="fas fa-chart-line"></i> Laba Rugi</a></li>
+                <li><a href="#" data-view="petty-cash"><i class="fas fa-money-bill-wave"></i> Petty Cash</a></li>
+                <li><a href="#" data-view="slip-gaji"><i class="fas fa-users"></i> Slip Gaji</a></li>
+                <li class="sidebar-divider"></li>
+                <li><a href="#" id="backup-restore-btn"><i class="fas fa-database"></i> Backup & Restore</a></li>
+                <li><a href="#" id="logout-btn"><i class="fas fa-sign-out-alt"></i> Keluar</a></li>
+            </ul>
+        </nav>
+
+        <!-- Konten Utama -->
+        <main id="main-content">
+            <header>
+                <h1 id="page-title">Dashboard</h1>
+                <div class="user-profile">
+                    <span>Selamat datang, <strong>User (Admin)</strong></span>
+                    <i class="fas fa-user-circle fa-2x"></i>
+                </div>
+            </header>
+
+            <!-- View Dashboard -->
+            <section id="dashboard-view" class="view">
+                <div class="dashboard-cards">
+                    <div class="card"><h3>Total Piutang</h3><p class="card-value" id="dash-piutang">Rp 0</p></div>
+                    <div class="card"><h3>Total Hutang</h3><p class="card-value" id="dash-hutang">Rp 0</p></div>
+                    <div class="card"><h3>Laba Bulan Ini</h3><p class="card-value" id="dash-laba">Rp 0</p></div>
+                    <div class="card"><h3>Kas di Bank</h3><p class="card-value" id="dash-kas">Rp 0</p></div>
+                </div>
+                <div class="recent-activity">
+                    <h2>Aktivitas Terkini</h2>
+                    <table>
+                        <thead><tr><th>Tanggal</th><th>Keterangan</th><th>Jumlah</th></tr></thead>
+                        <tbody id="recent-activity-body"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- View Invoice -->
+            <section id="invoice-view" class="view">
+                <div class="content-header"><h2>Manajemen Invoice</h2><button class="btn btn-primary" id="tambah-invoice-btn"><i class="fas fa-plus"></i> Tambah Invoice</button></div>
+                <div class="table-container"><table><thead><tr><th>No. Invoice</th><th>Customer</th><th>Tanggal</th><th>Jenis</th><th>Total</th><th>Status</th><th>Aksi</th></tr></thead><tbody id="invoice-table-body"></tbody></table></div>
+            </section>
+
+            <!-- View Jurnal Umum -->
+            <section id="jurnal-view" class="view">
+                <div class="content-header">
+                    <h2>Jurnal Umum</h2>
+                    <div>
+                        <button class="btn btn-secondary" id="export-jurnal-btn"><i class="fas fa-file-export"></i> Export Excel</button>
+                        <button class="btn btn-primary" id="tambah-jurnal-btn"><i class="fas fa-plus"></i> Tambah Jurnal</button>
+                    </div>
+                </div>
+                 <div class="table-container"><table><thead><tr><th>Tanggal</th><th>No. Bukti</th><th>Akun</th><th>Debit</th><th>Kredit</th><th>Keterangan</th></tr></thead><tbody id="jurnal-table-body"></tbody></table></div>
+            </section>
+            
+            <!-- View Buku Besar -->
+            <section id="buku-besar-view" class="view">
+                <div class="content-header">
+                    <h2>Buku Besar</h2>
+                    <button class="btn btn-secondary" id="export-besar-btn"><i class="fas fa-file-export"></i> Export Excel</button>
+                </div>
+                <div class="buku-besar-selector">
+                    <label for="account-select">Pilih Akun:</label>
+                    <select id="account-select"></select>
+                </div>
+                <div class="table-container"><table><thead><tr><th>Tanggal</th><th>Keterangan</th><th>Debit</th><th>Kredit</th><th>Saldo</th></tr></thead><tbody id="buku-besar-body"></tbody></table></div>
+            </section>
+
+            <!-- View Laba Rugi -->
+            <section id="laba-rugi-view" class="view">
+                <h2>Laporan Laba Rugi</h2>
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th>Akun</th><th>Jumlah</th></tr></thead>
+                        <tbody id="laba-rugi-body"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- View Petty Cash -->
+            <section id="petty-cash-view" class="view">
+                <div class="content-header"><h2>Manajemen Petty Cash</h2><button class="btn btn-primary" id="tambah-petty-cash-btn"><i class="fas fa-plus"></i> Tambah Transaksi</button></div>
+                <div class="table-container"><table><thead><tr><th>Tanggal</th><th>Keterangan</th><th>Debit</th><th>Kredit</th><th>Saldo</th></tr></thead><tbody id="petty-cash-body"></tbody></table></div>
+            </section>
+
+            <!-- View Slip Gaji -->
+            <section id="slip-gaji-view" class="view">
+                <div class="content-header"><h2>Manajemen Slip Gaji</h2><button class="btn btn-primary" id="tambah-gaji-btn"><i class="fas fa-plus"></i> Proses Gaji</button></div>
+                <div class="table-container"><table><thead><tr><th>Periode</th><th>Karyawan</th><th>Gaji Bersih</th><th>Aksi</th></tr></thead><tbody id="slip-gaji-body"></tbody></table></div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Modal -->
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="close">&times;</span>
+                <h2 id="modal-title">Judul Modal</h2>
+            </div>
+            <div class="modal-body" id="modal-body-content"></div>
+        </div>
+    </div>
+
+    <!-- Library untuk Export Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
