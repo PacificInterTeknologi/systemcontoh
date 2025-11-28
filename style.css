@@ -47,6 +47,11 @@ body {
     transition: var(--transition);
     box-shadow: 2px 0 5px rgba(0,0,0,0.1);
     overflow-y: auto;
+    transform: translateX(-100%);
+}
+
+#sidebar.active {
+    transform: translateX(0);
 }
 
 .sidebar-header {
@@ -147,7 +152,7 @@ body {
 
 /* --- Hamburger Menu --- */
 .hamburger-menu {
-    display: none;
+    display: block;
     position: fixed;
     top: 15px;
     left: 15px;
@@ -188,9 +193,13 @@ body {
 /* --- Main Content --- */
 main {
     flex-grow: 1;
-    margin-left: var(--sidebar-width);
+    margin-left: 0;
     padding: 20px;
     transition: var(--transition);
+}
+
+#sidebar.active ~ main {
+    margin-left: var(--sidebar-width);
 }
 
 main header {
@@ -570,18 +579,6 @@ tbody tr:hover {
 
 /* --- Responsive Design --- */
 @media (max-width: 768px) {
-    .hamburger-menu {
-        display: block;
-    }
-    
-    #sidebar {
-        transform: translateX(-100%);
-    }
-    
-    #sidebar.active {
-        transform: translateX(0);
-    }
-    
     main {
         margin-left: 0;
         padding: 60px 15px 15px;
