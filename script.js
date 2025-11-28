@@ -23,6 +23,7 @@ document.addEventListener('DOMContentLoaded', function() {
         tambahPettyCashBtn: document.getElementById('tambah-petty-cash-btn'),
         exportJurnalBtn: document.getElementById('export-jurnal-btn'),
         exportBesarBtn: document.getElementById('export-besar-btn'),
+        exportPettyCashBtn: document.getElementById('export-petty-cash-btn'),
         backupRestoreBtn: document.getElementById('backup-restore-btn'),
         logoutBtn: document.getElementById('logout-btn'),
         tambahGajiBtn: document.getElementById('tambah-gaji-btn'),
@@ -41,6 +42,7 @@ document.addEventListener('DOMContentLoaded', function() {
         coa: 'chartOfAccounts',
         customers: 'customers',
         salesReports: 'salesReports', // Tambahkan kunci untuk laporan penjualan
+        fixedAssets: 'fixedAssets',
     };
     
     // --- Data Master Default (Chart of Accounts) ---
@@ -51,6 +53,7 @@ document.addEventListener('DOMContentLoaded', function() {
         { id: 200, name: 'Piutang Usaha', type: 'Asset' },
         { id: 300, name: 'Persediaan Barang', type: 'Asset' },
         { id: 400, name: 'Peralatan Kantor', type: 'Asset' },
+        { id: 410, name: 'Akumulasi Penyusutan', type: 'Asset' },
         { id: 500, name: 'Hutang Usaha', type: 'Liability' },
         { id: 510, name: 'Utang Rembursement', type: 'Liability' },
         { id: 600, name: 'Modal Pemilik', type: 'Equity' },
@@ -60,6 +63,9 @@ document.addEventListener('DOMContentLoaded', function() {
         { id: 810, name: 'Beban Sewa Kantor', type: 'Expense' },
         { id: 820, name: 'Beban Biaya Bank', type: 'Expense' },
         { id: 830, name: 'Beban ATK', type: 'Expense' },
+        { id: 840, name: 'Beban Penyusutan', type: 'Expense' },
+        { id: 720, name: 'Keuntungan Penjualan Aset', type: 'Revenue' },
+        { id: 850, name: 'Kerugian Penjualan Aset', type: 'Expense' },
     ];
 
     // =====================================================
@@ -84,7 +90,16 @@ document.addEventListener('DOMContentLoaded', function() {
             writeToLS(LS_KEYS.payrolls, []);
             writeToLS(LS_KEYS.customers, []);
             writeToLS(LS_KEYS.salesReports, []); // Inisialisasi laporan penjualan
+            writeToLS(LS_KEYS.fixedAssets, []);
         }
+    }
+
+    function handleHapusSemuaTransaksiPettyCash() {
+        if (!confirm('Hapus semua transaksi Petty Cash kecuali Saldo Awal?')) return;
+        const transactions = readFromLS(LS_KEYS.pettyCash);
+        const kept = transactions.filter(t => (t.desc || '').toLowerCase() === 'saldo awal');
+        writeToLS(LS_KEYS.pettyCash, kept);
+        renderPettyCash();
     }
 
     /**
@@ -163,9 +178,10 @@ document.addEventListener('DOMContentLoaded', function() {
             return false;
         }
 
+        const jrId = `JR-${Date.now()}-${Math.floor(Math.random()*1000)}`;
         entries.forEach(entry => {
             journals.push({
-                date, ref, description,
+                date, ref, description, jrId,
                 accountId: entry.accountId,
                 accountName: getAccountName(entry.accountId),
                 debit: entry.debit || 0,
@@ -201,6 +217,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (viewName === 'pelanggan') renderDataPelanggan();
         if (viewName === 'neraca') renderNeraca();
         if (viewName === 'laporan-penjualan') renderLaporanPenjualan(); // Tambahkan render untuk laporan penjualan
+        if (viewName === 'aset-tetap') renderFixedAssets();
     }
 
     /**
@@ -276,13 +293,109 @@ document.addEventListener('DOMContentLoaded', function() {
         const tbody = document.getElementById('jurnal-table-body');
         tbody.innerHTML = '';
         if (journals.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Tidak ada data.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">Tidak ada data.</td></tr>';
             return;
         }
+        const groups = {};
         journals.sort((a,b)=> new Date(a.date) - new Date(b.date)).forEach(j => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `<td>${j.date}</td><td>${j.ref}</td><td>${j.accountName}</td><td class="debit">${formatCurrency(j.debit)}</td><td class="kredit">${formatCurrency(j.kredit)}</td><td>${j.description}</td>`;
-            tbody.appendChild(tr);
+            const key = j.jrId || `${j.date}|${j.ref}|${j.description}`;
+            if (!groups[key]) groups[key] = [];
+            groups[key].push(j);
+        });
+        Object.entries(groups).forEach(([key, rows]) => {
+            rows.forEach((j, idx) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td>${j.date}</td><td>${j.ref}</td><td>${j.accountName}</td><td class="debit">${formatCurrency(j.debit)}</td><td class="kredit">${formatCurrency(j.kredit)}</td><td>${j.description}</td><td class="action-buttons"></td>`;
+                const actionTd = tr.querySelector('.action-buttons');
+                if (idx === 0) {
+                    const groupId = j.jrId || key;
+                    actionTd.appendChild(createButton('btn btn-sm btn-warning', 'Edit', () => handleEditJurnal(groupId)));
+                    actionTd.appendChild(createButton('btn btn-sm btn-danger', 'Hapus', () => deleteJournalGroup(groupId)));
+                }
+                tbody.appendChild(tr);
+            });
+        });
+    }
+
+    function deleteJournalGroup(groupId) {
+        if (!confirm('Hapus jurnal beserta semua barisnya?')) return;
+        let journals = readFromLS(LS_KEYS.journals);
+        journals = journals.filter(j => (j.jrId || `${j.date}|${j.ref}|${j.description}`) !== groupId);
+        writeToLS(LS_KEYS.journals, journals);
+        renderJournals();
+        renderDashboard();
+        renderNeraca();
+        renderLabaRugi();
+    }
+
+    function handleEditJurnal(groupId) {
+        const journals = readFromLS(LS_KEYS.journals);
+        const groupRows = journals.filter(j => (j.jrId || `${j.date}|${j.ref}|${j.description}`) === groupId);
+        if (groupRows.length === 0) return;
+        const coa = readFromLS(LS_KEYS.coa);
+        const coaOptions = coa.map(acc => `<option value="${acc.id}">${acc.name}</option>`).join('');
+
+        const base = groupRows[0];
+        const formHtml = `
+            <form id="jurnal-form">
+                <div class="form-group"><label>Tanggal</label><input type="date" id="jr-date" required value="${base.date}"></div>
+                <div class="form-group"><label>No. Bukti</label><input type="text" id="jr-ref" required value="${base.ref}"></div>
+                <div class="form-group"><label>Keterangan</label><textarea id="jr-desc" required>${base.description}</textarea></div>
+                <div id="journal-entries"><h4>Entri Jurnal</h4></div>
+                <button type="button" class="btn btn-secondary" id="add-jr-row">Tambah Baris</button>
+                <div class="form-actions"><button type="button" class="btn btn-secondary" id="batal-jurnal">Batal</button><button type="submit" class="btn btn-primary">Simpan Perubahan</button></div>
+            </form>
+        `;
+        openModal('Edit Jurnal Umum', formHtml);
+
+        const entriesContainer = document.getElementById('journal-entries');
+        groupRows.forEach(r => {
+            const row = document.createElement('div'); row.className = 'journal-entry-row';
+            row.innerHTML = `<select class="jr-account">${coaOptions}</select><input type="number" placeholder="Debit" class="jr-debit"><input type="number" placeholder="Kredit" class="jr-kredit"><button type="button" class="btn btn-sm btn-danger jr-remove">Hapus Baris</button>`;
+            entriesContainer.appendChild(row);
+            row.querySelector('.jr-account').value = r.accountId;
+            row.querySelector('.jr-debit').value = r.debit || '';
+            row.querySelector('.jr-kredit').value = r.kredit || '';
+            row.querySelector('.jr-remove').addEventListener('click', () => row.remove());
+        });
+
+        document.getElementById('add-jr-row').addEventListener('click', () => {
+            const newRow = document.createElement('div'); newRow.className = 'journal-entry-row';
+            newRow.innerHTML = `<select class="jr-account">${coaOptions}</select><input type="number" placeholder="Debit" class="jr-debit"><input type="number" placeholder="Kredit" class="jr-kredit"><button type="button" class="btn btn-sm btn-danger jr-remove">Hapus Baris</button>`;
+            entriesContainer.appendChild(newRow);
+            newRow.querySelector('.jr-remove').addEventListener('click', () => newRow.remove());
+        });
+
+        document.getElementById('batal-jurnal').addEventListener('click', closeModal);
+        document.getElementById('jurnal-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const date = document.getElementById('jr-date').value;
+            const ref = document.getElementById('jr-ref').value;
+            const desc = document.getElementById('jr-desc').value;
+            const entries = [];
+            document.querySelectorAll('.journal-entry-row').forEach(row => {
+                const accId = parseInt(row.querySelector('.jr-account').value);
+                const debit = parseFloat(row.querySelector('.jr-debit').value) || 0;
+                const kredit = parseFloat(row.querySelector('.jr-kredit').value) || 0;
+                if (debit > 0 || kredit > 0) entries.push({ accountId: accId, debit, kredit });
+            });
+
+            let totalDebit = 0, totalKredit = 0;
+            entries.forEach(e => { totalDebit += e.debit || 0; totalKredit += e.kredit || 0; });
+            if (Math.round(totalDebit) !== Math.round(totalKredit)) { alert('Error: Total Debit dan Kredit harus sama!'); return; }
+
+            let all = readFromLS(LS_KEYS.journals);
+            all = all.filter(j => (j.jrId || `${j.date}|${j.ref}|${j.description}`) !== groupId);
+            const jrId = groupRows[0].jrId || `JR-${Date.now()}-${Math.floor(Math.random()*1000)}`;
+            entries.forEach(entry => {
+                all.push({ date, ref, description: desc, jrId, accountId: entry.accountId, accountName: getAccountName(entry.accountId), debit: entry.debit || 0, kredit: entry.kredit || 0 });
+            });
+            writeToLS(LS_KEYS.journals, all);
+            closeModal();
+            renderJournals();
+            renderDashboard();
+            renderNeraca();
+            renderLabaRugi();
         });
     }
 
@@ -384,12 +497,25 @@ document.addEventListener('DOMContentLoaded', function() {
         const tbody = document.getElementById('petty-cash-body');
         tbody.innerHTML = '';
         let balance = 0;
-        transactions.forEach(t => {
+        transactions.forEach((t, idx) => {
             balance += t.debit - t.kredit;
             const tr = document.createElement('tr');
-            tr.innerHTML = `<td>${t.date}</td><td>${t.desc}</td><td>${formatCurrency(t.debit)}</td><td>${formatCurrency(t.kredit)}</td><td>${formatCurrency(balance)}</td>`;
+            tr.innerHTML = `<td>${t.date}</td><td>${t.desc}</td><td>${formatCurrency(t.debit)}</td><td>${formatCurrency(t.kredit)}</td><td>${formatCurrency(balance)}</td><td class="action-buttons"></td>`;
+            const actionTd = tr.querySelector('.action-buttons');
+            const isOpening = (t.desc || '').toLowerCase() === 'saldo awal';
+            actionTd.appendChild(createButton(`btn btn-sm ${isOpening ? 'btn-secondary' : 'btn-danger'}`, isOpening ? '—' : 'Hapus', () => { if (!isOpening) deletePettyCash(idx); }));
             tbody.appendChild(tr);
         });
+    }
+
+    function deletePettyCash(index) {
+        if (!confirm('Hapus transaksi ini?')) return;
+        const transactions = readFromLS(LS_KEYS.pettyCash);
+        const t = transactions[index];
+        if ((t.desc || '').toLowerCase() === 'saldo awal') { alert('Tidak dapat menghapus Saldo Awal.'); return; }
+        transactions.splice(index, 1);
+        writeToLS(LS_KEYS.pettyCash, transactions);
+        renderPettyCash();
     }
 
     /** Render data ke tabel Pelanggan. */
@@ -1211,8 +1337,9 @@ document.addEventListener('DOMContentLoaded', function() {
         
         document.getElementById('add-jr-row').addEventListener('click', () => {
             const newRow = document.createElement('div'); newRow.className = 'journal-entry-row';
-            newRow.innerHTML = `<select class="jr-account">${coaOptions}</select><input type="number" placeholder="Debit" class="jr-debit"><input type="number" placeholder="Kredit" class="jr-kredit">`;
+            newRow.innerHTML = `<select class="jr-account">${coaOptions}</select><input type="number" placeholder="Debit" class="jr-debit"><input type="number" placeholder="Kredit" class="jr-kredit"><button type="button" class="btn btn-sm btn-danger jr-remove">Hapus Baris</button>`;
             document.getElementById('journal-entries').insertBefore(newRow, document.getElementById('add-jr-row'));
+            newRow.querySelector('.jr-remove').addEventListener('click', () => newRow.remove());
         });
 
         document.getElementById('batal-jurnal').addEventListener('click', closeModal);
@@ -1292,12 +1419,278 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // --- Placeholder untuk handler lainnya (dapat dikembangkan serupa) ---
-    function handleTambahPettyCash() { alert('Fitur ini akan segera hadir.'); }
-    function handleExportJurnal() { alert('Fitur Export akan segera hadir.'); }
-    function handleExportBesar() { alert('Fitur Export akan segera hadir.'); }
+    function handleTambahPettyCash() {
+        const today = new Date().toISOString().split('T')[0];
+        const formHtml = `
+            <form id="petty-form">
+                <div class="form-group"><label>Tanggal</label><input type="date" id="pc-date" required value="${today}"></div>
+                <div class="form-group"><label>Keterangan</label><input type="text" id="pc-desc" required></div>
+                <div class="form-group"><label>Debit</label><input type="number" id="pc-debit" min="0" step="1" placeholder="0"></div>
+                <div class="form-group"><label>Kredit</label><input type="number" id="pc-kredit" min="0" step="1" placeholder="0"></div>
+                <div class="form-actions"><button type="button" class="btn btn-secondary" id="batal-petty">Batal</button><button type="submit" class="btn btn-primary">Simpan</button></div>
+            </form>
+        `;
+        openModal('Tambah Transaksi Petty Cash', formHtml);
+        document.getElementById('batal-petty').addEventListener('click', closeModal);
+        document.getElementById('petty-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const date = document.getElementById('pc-date').value;
+            const desc = document.getElementById('pc-desc').value;
+            const debit = parseFloat(document.getElementById('pc-debit').value) || 0;
+            const kredit = parseFloat(document.getElementById('pc-kredit').value) || 0;
+            if ((debit <= 0 && kredit <= 0) || (debit > 0 && kredit > 0)) {
+                alert('Isi salah satu: Debit ATAU Kredit, dan harus > 0.');
+                return;
+            }
+            const transactions = readFromLS(LS_KEYS.pettyCash);
+            transactions.push({ date, desc, debit, kredit });
+            writeToLS(LS_KEYS.pettyCash, transactions);
+            closeModal();
+            renderPettyCash();
+        });
+    }
+    function handleExportJurnal() {
+        const journals = readFromLS(LS_KEYS.journals);
+        if (journals.length === 0) { alert('Tidak ada data jurnal untuk diekspor.'); return; }
+        const ws = XLSX.utils.json_to_sheet(journals.map(j => ({
+            'Tanggal': j.date,
+            'No. Bukti': j.ref,
+            'Akun': j.accountName,
+            'Debit': j.debit,
+            'Kredit': j.kredit,
+            'Keterangan': j.description
+        })));
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Jurnal Umum');
+        XLSX.writeFile(wb, `Jurnal_Umum_${new Date().toISOString().split('T')[0]}.xlsx`);
+    }
+    function handleExportBesar() {
+        const accountSelect = document.getElementById('account-select');
+        if (!accountSelect || !accountSelect.value) { alert('Pilih akun terlebih dahulu.'); return; }
+        const accountId = parseInt(accountSelect.value);
+        const accountName = getAccountName(accountId);
+        const journals = readFromLS(LS_KEYS.journals).filter(j => j.accountId === accountId).sort((a,b)=> new Date(a.date) - new Date(b.date));
+        if (journals.length === 0) { alert('Tidak ada data untuk akun ini.'); return; }
+        let balance = 0;
+        const rows = journals.map(j => {
+            balance += j.debit - j.kredit;
+            return {
+                'Tanggal': j.date,
+                'Keterangan': j.description,
+                'Debit': j.debit,
+                'Kredit': j.kredit,
+                'Saldo': balance
+            };
+        });
+        const ws = XLSX.utils.json_to_sheet(rows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, `Buku Besar - ${accountName}`);
+        XLSX.writeFile(wb, `Buku_Besar_${accountName.replace(/\s+/g,'_')}_${new Date().toISOString().split('T')[0]}.xlsx`);
+    }
+    function handleExportPettyCash() {
+        const transactions = readFromLS(LS_KEYS.pettyCash);
+        if (transactions.length === 0) { alert('Tidak ada data petty cash untuk diekspor.'); return; }
+        let balance = 0;
+        const rows = transactions.map(t => {
+            balance += t.debit - t.kredit;
+            return {
+                'Tanggal': t.date,
+                'Keterangan': t.desc,
+                'Debit': t.debit,
+                'Kredit': t.kredit,
+                'Saldo': balance
+            };
+        });
+        const ws = XLSX.utils.json_to_sheet(rows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Petty Cash');
+        XLSX.writeFile(wb, `Petty_Cash_${new Date().toISOString().split('T')[0]}.xlsx`);
+    }
     function handleBackupRestore() { alert('Fitur Backup & Restore akan segera hadir.'); }
     function handleLogout() { if (confirm('Keluar dari sistem?')) location.reload(); }
     function handleTambahGaji() { alert('Fitur Slip Gaji akan segera hadir.'); }
+
+    function renderFixedAssets() {
+        const assets = readFromLS(LS_KEYS.fixedAssets);
+        const tbody = document.getElementById('aset-tetap-body');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+        if (assets.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;">Tidak ada aset.</td></tr>';
+            return;
+        }
+        assets.forEach(a => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${a.name}</td>
+                <td>${a.startDate}</td>
+                <td>${a.lifeMonths}</td>
+                <td>${a.quantity}</td>
+                <td>${a.method}</td>
+                <td>${formatCurrency(a.unitCost)}</td>
+                <td>${a.disposed ? 'Dijual' : 'Aktif'}</td>
+                <td class="action-buttons"></td>
+            `;
+            const actionTd = tr.querySelector('.action-buttons');
+            if (!a.disposed) {
+                actionTd.appendChild(createButton('btn btn-sm btn-info', 'Penyusutan', () => handlePenyusutanAset(a.id)));
+                actionTd.appendChild(createButton('btn btn-sm btn-warning', 'Edit', () => handleTambahAset(a.id)));
+                actionTd.appendChild(createButton('btn btn-sm btn-secondary', 'Jual', () => handleDisposisiAset(a.id)));
+            }
+            actionTd.appendChild(createButton('btn btn-sm btn-danger', 'Hapus', () => deleteAsset(a.id)));
+            tbody.appendChild(tr);
+        });
+    }
+
+    function handleTambahAset(assetId = null) {
+        const isEdit = !!assetId;
+        const assets = readFromLS(LS_KEYS.fixedAssets);
+        const asset = isEdit ? assets.find(a => a.id === assetId) : null;
+        const formHtml = `
+            <form id="aset-form">
+                <div class="form-group"><label>Nama Aset</label><input type="text" id="fa-name" required value="${asset?.name || ''}"></div>
+                <div class="form-group"><label>Tanggal Pakai</label><input type="date" id="fa-start" required value="${asset?.startDate || ''}"></div>
+                <div class="form-group"><label>Umur (bulan)</label><input type="number" id="fa-life" required value="${asset?.lifeMonths || ''}"></div>
+                <div class="form-group"><label>Kuantitas</label><input type="number" id="fa-qty" required value="${asset?.quantity || 1}"></div>
+                <div class="form-group"><label>Metode</label>
+                    <select id="fa-method"><option value="Garis Lurus" ${asset?.method === 'Garis Lurus' ? 'selected' : ''}>Garis Lurus</option></select>
+                </div>
+                <div class="form-group"><label>Harga per Unit</label><input type="number" id="fa-cost" required value="${asset?.unitCost || ''}"></div>
+                <div class="form-actions"><button type="button" class="btn btn-secondary" id="batal-aset">Batal</button><button type="submit" class="btn btn-primary">${isEdit ? 'Simpan' : 'Tambah'}</button></div>
+            </form>
+        `;
+        openModal(isEdit ? 'Edit Aset Tetap' : 'Tambah Aset Tetap', formHtml);
+        document.getElementById('batal-aset').addEventListener('click', closeModal);
+        document.getElementById('aset-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const newAsset = {
+                id: isEdit ? asset.id : `FA-${Date.now()}-${Math.floor(Math.random()*1000)}`,
+                name: document.getElementById('fa-name').value,
+                startDate: document.getElementById('fa-start').value,
+                lifeMonths: parseInt(document.getElementById('fa-life').value),
+                quantity: parseInt(document.getElementById('fa-qty').value),
+                method: document.getElementById('fa-method').value,
+                unitCost: parseFloat(document.getElementById('fa-cost').value),
+                accountId: 400,
+                accumulatedDep: asset?.accumulatedDep || 0,
+                disposed: asset?.disposed || false,
+            };
+            let list = readFromLS(LS_KEYS.fixedAssets);
+            if (isEdit) {
+                const idx = list.findIndex(a => a.id === assetId);
+                if (idx > -1) list[idx] = newAsset;
+            } else {
+                list.push(newAsset);
+                createJournalEntry(newAsset.startDate, `FA-${newAsset.id}`, [ { accountId: 400, debit: newAsset.unitCost * newAsset.quantity }, { accountId: 100, kredit: newAsset.unitCost * newAsset.quantity } ], `Perolehan Aset: ${newAsset.name}`);
+            }
+            writeToLS(LS_KEYS.fixedAssets, list);
+            closeModal();
+            renderFixedAssets();
+            renderJournals();
+            renderDashboard();
+            renderNeraca();
+        });
+    }
+
+    function monthlyDepAmount(asset) {
+        return (asset.unitCost * asset.quantity) / asset.lifeMonths;
+    }
+
+    function handlePenyusutanAset(assetId) {
+        const assets = readFromLS(LS_KEYS.fixedAssets);
+        const asset = assets.find(a => a.id === assetId);
+        if (!asset || asset.disposed) return;
+        const formHtml = `
+            <form id="dep-form">
+                <div class="form-group"><label>Tanggal Penyusutan</label><input type="date" id="dep-date" required></div>
+                <div class="form-actions"><button type="button" class="btn btn-secondary" id="batal-dep">Batal</button><button type="submit" class="btn btn-primary">Catat</button></div>
+            </form>
+        `;
+        openModal(`Penyusutan: ${asset.name}`, formHtml);
+        document.getElementById('batal-dep').addEventListener('click', closeModal);
+        document.getElementById('dep-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const date = document.getElementById('dep-date').value;
+            const monthly = monthlyDepAmount(asset);
+            const totalCost = asset.unitCost * asset.quantity;
+            const remaining = Math.max(0, totalCost - asset.accumulatedDep);
+            const amount = Math.min(monthly, remaining);
+            if (amount <= 0) { alert('Aset sudah penuh disusutkan.'); return; }
+            createJournalEntry(date, `DEP-${asset.id}`, [ { accountId: 840, debit: amount }, { accountId: 410, kredit: amount } ], `Penyusutan ${asset.name}`);
+            asset.accumulatedDep = (asset.accumulatedDep || 0) + amount;
+            const list = readFromLS(LS_KEYS.fixedAssets).map(a => a.id === asset.id ? asset : a);
+            writeToLS(LS_KEYS.fixedAssets, list);
+            closeModal();
+            renderFixedAssets();
+            renderJournals();
+            renderDashboard();
+            renderNeraca();
+            renderLabaRugi();
+        });
+    }
+
+    function handleDisposisiAset(assetId) {
+        const assets = readFromLS(LS_KEYS.fixedAssets);
+        const asset = assets.find(a => a.id === assetId);
+        if (!asset || asset.disposed) return;
+        const cashAccounts = readFromLS(LS_KEYS.coa).filter(acc => acc.type === 'Asset');
+        const accOptions = cashAccounts.map(acc => `<option value="${acc.id}">${acc.name}</option>`).join('');
+        const formHtml = `
+            <form id="dispose-form">
+                <div class="form-group"><label>Tanggal Jual</label><input type="date" id="disp-date" required></div>
+                <div class="form-group"><label>Harga Jual</label><input type="number" id="disp-price" required></div>
+                <div class="form-group"><label>Akun Penerimaan</label><select id="disp-acc">${accOptions}</select></div>
+                <div class="form-actions"><button type="button" class="btn btn-secondary" id="batal-disp">Batal</button><button type="submit" class="btn btn-primary">Proses Jual</button></div>
+            </form>
+        `;
+        openModal(`Jual Aset: ${asset.name}`, formHtml);
+        document.getElementById('batal-disp').addEventListener('click', closeModal);
+        document.getElementById('dispose-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const date = document.getElementById('disp-date').value;
+            const price = parseFloat(document.getElementById('disp-price').value);
+            const cashAccId = parseInt(document.getElementById('disp-acc').value);
+            const totalCost = asset.unitCost * asset.quantity;
+            const monthly = monthlyDepAmount(asset);
+            const remainingDepBeforeSale = Math.max(0, totalCost - (asset.accumulatedDep || 0));
+            const lastDep = Math.min(monthly, remainingDepBeforeSale);
+            if (lastDep > 0) {
+                createJournalEntry(date, `DEP-LAST-${asset.id}`, [ { accountId: 840, debit: lastDep }, { accountId: 410, kredit: lastDep } ], `Penyusutan terakhir sebelum jual - ${asset.name}`);
+                asset.accumulatedDep = (asset.accumulatedDep || 0) + lastDep;
+            }
+            const bookValue = Math.max(0, totalCost - (asset.accumulatedDep || 0));
+            const entries = [
+                { accountId: cashAccId, debit: price },
+                { accountId: 410, debit: asset.accumulatedDep || 0 },
+                { accountId: 400, kredit: totalCost }
+            ];
+            if (price > bookValue) {
+                entries.push({ accountId: 720, kredit: price - bookValue });
+            } else if (price < bookValue) {
+                entries.push({ accountId: 850, debit: bookValue - price });
+            }
+            createJournalEntry(date, `SALE-${asset.id}`, entries, `Penjualan Aset: ${asset.name}`);
+            asset.disposed = true;
+            asset.disposalDate = date;
+            asset.saleProceeds = price;
+            const list = readFromLS(LS_KEYS.fixedAssets).map(a => a.id === asset.id ? asset : a);
+            writeToLS(LS_KEYS.fixedAssets, list);
+            closeModal();
+            renderFixedAssets();
+            renderJournals();
+            renderDashboard();
+            renderNeraca();
+            renderLabaRugi();
+        });
+    }
+
+    function deleteAsset(assetId) {
+        if (!confirm('Hapus aset ini?')) return;
+        let list = readFromLS(LS_KEYS.fixedAssets);
+        list = list.filter(a => a.id !== assetId);
+        writeToLS(LS_KEYS.fixedAssets, list);
+        renderFixedAssets();
+    }
 
     // =====================================================
     // === 6. INISIALISASI EVENT LISTENER               ===
@@ -1337,10 +1730,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const viewName = link.getAttribute('data-view');
                 if (viewName) {
                     showView(viewName);
-                    // Tutup sidebar setelah memilih menu pada layar kecil
-                    if (window.innerWidth <= 768) {
-                        elements.sidebar.classList.remove('active');
-                    }
+                    elements.sidebar.classList.remove('active');
                 }
             });
         });
@@ -1354,6 +1744,16 @@ document.addEventListener('DOMContentLoaded', function() {
         elements.backupRestoreBtn.addEventListener('click', handleBackupRestore);
         elements.logoutBtn.addEventListener('click', handleLogout);
         elements.tambahGajiBtn.addEventListener('click', handleTambahGaji);
+
+        const tambahAsetBtn = document.getElementById('tambah-aset-btn');
+        if (tambahAsetBtn) {
+            tambahAsetBtn.addEventListener('click', () => handleTambahAset());
+        }
+
+        const hapusSemuaPettyBtn = document.getElementById('hapus-semua-petty-btn');
+        if (hapusSemuaPettyBtn) {
+            hapusSemuaPettyBtn.addEventListener('click', () => handleHapusSemuaTransaksiPettyCash());
+        }
 
         if(elements.tambahPelangganBtn) {
             elements.tambahPelangganBtn.addEventListener('click', handleTambahPelanggan);
@@ -1381,3 +1781,6 @@ document.addEventListener('DOMContentLoaded', function() {
     renderPettyCash();
     setupEventListeners();
 });
+        if (elements.exportPettyCashBtn) {
+            elements.exportPettyCashBtn.addEventListener('click', handleExportPettyCash);
+        }
