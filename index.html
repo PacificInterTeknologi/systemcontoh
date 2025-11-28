@@ -31,11 +31,13 @@
                 <li><a href="#" data-view="dashboard" class="active"><i class="fas fa-home"></i> Dashboard</a></li>
                 <li><a href="#" data-view="pelanggan"><i class="fas fa-users"></i> Pelanggan</a></li>
                 <li><a href="#" data-view="invoice"><i class="fas fa-file-invoice-dollar"></i> Invoice</a></li>
+                <li><a href="#" data-view="laporan-penjualan"><i class="fas fa-chart-bar"></i> Laporan Penjualan</a></li>
                 <li><a href="#" data-view="jurnal-umum"><i class="fas fa-book"></i> Jurnal Umum</a></li>
+                <li><a href="#" data-view="petty-cash"><i class="fas fa-money-bill-wave"></i> Petty Cash</a></li>
                 <li><a href="#" data-view="buku-besar"><i class="fas fa-book-open"></i> Buku Besar</a></li>
                 <li><a href="#" data-view="laba-rugi"><i class="fas fa-chart-line"></i> Laba Rugi</a></li>
                 <li><a href="#" data-view="neraca"><i class="fas fa-balance-scale"></i> Neraca</a></li>
-                <li><a href="#" data-view="petty-cash"><i class="fas fa-money-bill-wave"></i> Petty Cash</a></li>
+                <li><a href="#" data-view="aset-tetap"><i class="fas fa-cubes"></i> Aset Tetap</a></li>
                 <li class="sidebar-divider"></li>
                 <li>
                     <a href="#" class="dropdown-toggle" data-toggle="hr-menu">
@@ -46,7 +48,6 @@
                     </ul>
                 </li>
                 <li class="sidebar-divider"></li>
-                <li><a href="#" data-view="laporan-penjualan"><i class="fas fa-chart-bar"></i> Laporan Penjualan</a></li>
                 <li><a href="#" id="backup-restore-btn"><i class="fas fa-database"></i> Backup & Restore</a></li>
                 <li><a href="#" id="logout-btn"><i class="fas fa-sign-out-alt"></i> Keluar</a></li>
             </ul>
@@ -160,10 +161,38 @@
                                 <th>Debit</th>
                                 <th>Kredit</th>
                                 <th>Keterangan</th>
+                                <th>Aksi</th>
                             </tr>
                         </thead>
                         <tbody id="jurnal-table-body">
                             <!-- Data jurnal akan dimuat di sini oleh JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- View Aset Tetap -->
+            <section id="aset-tetap-view" class="view">
+                <div class="content-header">
+                    <h2>Aset Tetap</h2>
+                    <button class="btn btn-primary" id="tambah-aset-btn"><i class="fas fa-plus"></i> Tambah Aset</button>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Nama Aset</th>
+                                <th>Tanggal Pakai</th>
+                                <th>Umur (bulan)</th>
+                                <th>Kuantitas</th>
+                                <th>Metode</th>
+                                <th>Harga/Unit</th>
+                                <th>Status</th>
+                                <th>Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="aset-tetap-body">
+                            <!-- Data aset tetap dimuat oleh JavaScript -->
                         </tbody>
                     </table>
                 </div>
@@ -241,7 +270,11 @@
             <section id="petty-cash-view" class="view">
                 <div class="content-header">
                     <h2>Manajemen Petty Cash</h2>
-                    <button class="btn btn-primary" id="tambah-petty-cash-btn"><i class="fas fa-plus"></i> Tambah Transaksi</button>
+                    <div class="button-group">
+                        <button class="btn btn-primary" id="tambah-petty-cash-btn"><i class="fas fa-plus"></i> Tambah Transaksi</button>
+                        <button class="btn btn-secondary" id="export-petty-cash-btn"><i class="fas fa-file-export"></i> Export Excel</button>
+                        <button class="btn btn-danger" id="hapus-semua-petty-btn"><i class="fas fa-trash"></i> Hapus Semua Transaksi</button>
+                    </div>
                 </div>
                 <div class="table-container">
                     <table>
@@ -252,6 +285,7 @@
                                 <th>Debit</th>
                                 <th>Kredit</th>
                                 <th>Saldo</th>
+                                <th>Aksi</th>
                             </tr>
                         </thead>
                         <tbody id="petty-cash-body">
